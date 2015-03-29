@@ -1,6 +1,7 @@
 
-#include "SDL.h"
+#include "SDL/SDL.h"
 #include <math.h>
+#include <cmath>
 #include <assert.h>
 #include <iostream>
 #include <map>
@@ -71,7 +72,7 @@ Uint32 getColour(unsigned int it, double x)
 	{
 		//HELL YEAH EXPENSIVE MATHS!!
 		//Aproximate range: From 0.3 to 1018 and then infinity (O.o)
-		double index = it + (log(2*(log(Bailout))) - (log(log(abs(x)))))/log(power);
+		double index = it + (log(2*(log(Bailout))) - (log(log(std::abs(x)))))/log(power);
 		return SDL_MapRGB(frac->format, (sin(index))*255, (sin(index+50))*255, (sin(index+100))*255);
 	}
 	else
@@ -91,8 +92,8 @@ void CreateFractal(region r)
 	}
 	SDL_LockSurface(frac);
 	Uint32* pix = (Uint32*)frac->pixels;
-	long double incX = abs((r.Rmax - r.Rmin)/frac->w);
-	long double incY = abs((r.Imax - r.Imin)/frac->h);
+	long double incX = std::abs((r.Rmax - r.Rmin)/frac->w);
+	long double incY = std::abs((r.Imax - r.Imin)/frac->h);
 	for(int i = lastI; i < (lastI+10); i++)
 	{
 		if (i == frac->h)
@@ -225,8 +226,8 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e )
 	{
 		int rx = MouseX;
 		int ry = MouseY;
-		int rw = abs(MouseX - rectX);
-		int rh = abs(MouseY - rectY);
+		int rw = std::abs(MouseX - rectX);
+		int rh = std::abs(MouseY - rectY);
 		
 	
 
