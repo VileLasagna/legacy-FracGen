@@ -10,7 +10,7 @@
 
 #undef main
 
-struct region{double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region in the Argand-Gauss Plane (R X I)
+struct region{long double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region in the Argand-Gauss Plane (R X I)
 bool operator==(const region& r1, const region& r2){return ( (r1.Imax == r2.Imax) && (r1.Imin == r2.Imin) && (r1.Rmax == r2.Rmax) && (r1.Rmin == r2.Rmin) );}
 
 region reg;
@@ -18,13 +18,13 @@ SDL_Surface* screen;
 SDL_Surface* frac;
 SDL_Surface* highlight;
 bool endProgram;
-unsigned int max_iteration = 3000;
-double Bailout = 2;
-double power = 2;
+unsigned int max_iteration = 10000;
+long double Bailout = 2;
+long double power = 2;
 int w =	1280;
 int h = 720;
 int bpp = 32;
-std::map<double,int> iterations;
+std::map<long double,int> iterations;
 float aspect = (float)w/(float)h;
 bool drawRect = false;
 int rectX = 0;
@@ -78,7 +78,7 @@ Uint32 getColour(unsigned int it, double x)
 	{
 		//HELL YEAH EXPENSIVE MATHS!!
 		//Aproximate range: From 0.3 to 1018 and then infinity (O.o)
-		double index = it + (log(2*(log(Bailout))) - (log(log(std::abs(x)))))/log(power);
+		long double index = it + (log(2*(log(Bailout))) - (log(log(std::abs(x)))))/log(power);
 		return SDL_MapRGB(frac->format, (sin(index))*255, (sin(index+50))*255, (sin(index+100))*255);
 	}
 	else
