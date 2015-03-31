@@ -20,7 +20,8 @@ SDL_Surface* screen;
 SDL_Surface* frac;
 SDL_Surface* highlight;
 bool endProgram;
-unsigned int max_iteration = 10000;
+unsigned int iteration_factor = 100;
+unsigned int max_iteration = 256 * iteration_factor;
 long double Bailout = 2;
 long double power = 2;
 int w =	1280;
@@ -82,13 +83,24 @@ Uint32 getColour(unsigned int it, double x) noexcept
 	{
 		//HELL YEAH EXPENSIVE MATHS!!
 		//Aproximate range: From 0.3 to 1018 and then infinity (O.o)
-		long double index = it + (log(2*(log(Bailout))) - (log(log(std::abs(x)))))/log(power);
-		return SDL_MapRGB(frac->format, (sin(index))*255, (sin(index+50))*255, (sin(index+100))*255);
+//		long double index = it + (log(2*(log(Bailout))) - (log(log(std::abs(x)))))/log(power);
+//		return SDL_MapRGB(frac->format, (sin(index))*255, (sin(index+50))*255, (sin(index+100))*255);
+        return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
 	}
 	else
 	{
+        //std::cout<< it <<std::endl;
+
         //return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
-        return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
+        if(it == max_iteration)
+        {
+            return SDL_MapRGB(frac->format, 0, 0 , 0);
+        }
+        else
+        {
+            return SDL_MapRGB(frac->format, std::min(it,255u) , 0, std::min(it,255u) );
+            //return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
+        }
 	}
 
 }
