@@ -16,16 +16,20 @@ CONFIG(debug, debug|release) \
 SOURCES += \
     FracGen/main.cpp
 
+QMAKE_CXXFLAGS += -std=c++1y
+
+
+
 linux-g++:contains(QMAKE_HOST.arch, x86_64):\
 {
     # include SDL
-    LIBS += -L/usr/lib64 -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_gfx -lSDL2_mixer -lGL -lglut -lGLU #-lSDL2_test
+    LIBS += -L/usr/lib64 -lSDL #-lSDL2_image -lSDL2_ttf -lSDL2_gfx -lSDL2_mixer -lGL -lglut -lGLU #-lSDL2_test
     message("Configured for 64bits GCC Linux")
 }
 linux-g++:contains(QMAKE_HOST.arch, x86):\
 {
     # include SDL
-    LIBS += -L/usr/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_gfx -lSDL2_mixer -lSDL2_test -lGL -lglut -lGLU
+    LIBS += -L/usr/lib -lSDL #-lSDL2_image -lSDL2_ttf -lSDL2_gfx -lSDL2_mixer -lSDL2_test -lGL -lglut -lGLU
     message("Configured for 32bits GCC Linux")
 }
 
