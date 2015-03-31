@@ -7,6 +7,8 @@
 #include <map>
 #include <array>
 #include <future>
+#include <chrono>
+#include <cstdlib>
 
 #undef main
 
@@ -34,14 +36,16 @@ int MouseY = 0;
 int lastI = 0;
 bool creating = false;
 bool ColourScheme = false;
+auto genTime (std::chrono::high_resolution_clock::now());
+char buf[20];
 
-constexpr int numDivs = 8;
+constexpr int numDivs = 20;
 
 std::array<std::future<bool>, numDivs> tasks;
 
 
 
-void createHighlight()
+void createHighlight() noexcept
 {
 	highlight = SDL_CreateRGBSurface(SDL_HWSURFACE|SDL_DOUBLEBUF|SDL_ASYNCBLIT,w,h,bpp,0,0,0,0);
 
@@ -58,7 +62,7 @@ void createHighlight()
 	SDL_SetAlpha(highlight, SDL_SRCALPHA|SDL_RLEACCEL,128);
 }
 
-void DrawHL()
+void DrawHL() noexcept
 {
 	SDL_Rect r;
 	r.x = (rectX<MouseX?rectX:MouseX);
@@ -70,7 +74,7 @@ void DrawHL()
 
 
 
-Uint32 getColour(unsigned int it, double x)
+Uint32 getColour(unsigned int it, double x) noexcept
 {
 	
 
@@ -83,13 +87,14 @@ Uint32 getColour(unsigned int it, double x)
 	}
 	else
 	{
-		return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
+        //return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
+        return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
 	}
 
 }
 
 
-void CreateFractal(region r)
+void CreateFractal(region r) noexcept
 {
 	//this legacy unused function is here for reference
 	if(creating == false)
@@ -140,7 +145,7 @@ void CreateFractal(region r)
 	
 }
 
-void paint()
+void paint() noexcept
 {
 	SDL_BlitSurface(frac,0,screen,0);
 	if(drawRect)
@@ -153,7 +158,7 @@ void paint()
 }
 
 
-auto fracGen = [](region r,int index, int numTasks, Uint32* pix, int h0)
+auto fracGen = [](region r,int index, int numTasks, Uint32* pix, int h0) noexcept
 {
 
 	//Uint32* pix = (Uint32*)frac->pixels;
@@ -192,7 +197,7 @@ auto fracGen = [](region r,int index, int numTasks, Uint32* pix, int h0)
 	return false;
 };
 
-void spawnTasks(region reg)
+void spawnTasks(region reg) noexcept
 {
 	creating = true;
 	static std::atomic<int> h {0};
@@ -200,10 +205,10 @@ void spawnTasks(region reg)
 	SDL_LockSurface(frac);
 	for(uint i = 0; i < tasks.size(); i++)
 	{
-		tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), (Uint32*)frac->pixels,h.load());
+        tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), (Uint32*)frac->pixels,h.load());
 
 	}
-	h+= 10;
+    h+= 10;
 
 	for(uint i = 0; i < tasks.size(); i++)
 	{
@@ -211,6 +216,12 @@ void spawnTasks(region reg)
 		{
 			h.store(0);
 			creating = false;
+            auto d = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - genTime).count();
+            std::string caption = "Fractal Generation took ";
+            int n = sprintf(buf,"%d%", d);
+            caption.append(buf);
+            caption += " milliseconds";
+            SDL_WM_SetCaption( caption.c_str() ,0);
 		}
 	}
 	SDL_UnlockSurface(frac);
@@ -221,14 +232,13 @@ void spawnTasks(region reg)
 }
 
 
-
-void onKeyboardEvent(const SDL_KeyboardEvent& ) 
+void onKeyboardEvent(const SDL_KeyboardEvent& ) noexcept
 {
 
 
 }
 
-void onMouseMotionEvent(const SDL_MouseMotionEvent& e)
+void onMouseMotionEvent(const SDL_MouseMotionEvent& e) noexcept
 {
 	MouseX = e.x;
 	MouseY = e.y;
@@ -255,7 +265,7 @@ void onMouseMotionEvent(const SDL_MouseMotionEvent& e)
 	}
 }
 
-void onMouseButtonEvent(const SDL_MouseButtonEvent& e ) 
+void onMouseButtonEvent(const SDL_MouseButtonEvent& e ) noexcept
 {
 	if (creating)
 	{
@@ -279,6 +289,7 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e )
 		//Middle Button
 		ColourScheme = !ColourScheme;
 		//CreateFractal(reg);
+        genTime = std::chrono::high_resolution_clock::now();
 		spawnTasks(reg);
 		return;
 	}
@@ -290,6 +301,7 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e )
 		reg.Rmax = 1;
 		reg.Rmin = -2;
 		//CreateFractal(reg);
+        genTime = std::chrono::high_resolution_clock::now();
 		spawnTasks(reg);
 		return;
 	}
@@ -324,12 +336,13 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e )
 
 		drawRect = false;
 		//CreateFractal(reg);
+        genTime = std::chrono::high_resolution_clock::now();
 		spawnTasks(reg);
 	}
 
 }
 
-void capture()
+void capture() noexcept
 {
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
@@ -375,7 +388,7 @@ void capture()
 
 
 
-int main (int , char**)
+int main (int , char**) noexcept
 {
 	endProgram = false;
 	SDL_Init(SDL_INIT_EVERYTHING);
@@ -393,6 +406,7 @@ int main (int , char**)
 
 
 	//CreateFractal(reg);
+    genTime = std::chrono::high_resolution_clock::now();
 	spawnTasks(reg);
 	createHighlight();
 
