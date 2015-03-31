@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <iostream>
 #include <map>
+#include <array>
+#include <future>
 
 #undef main
 
@@ -16,7 +18,7 @@ SDL_Surface* screen;
 SDL_Surface* frac;
 SDL_Surface* highlight;
 bool endProgram;
-unsigned int max_iteration = 1000;
+unsigned int max_iteration = 3000;
 double Bailout = 2;
 double power = 2;
 int w =	1280;
@@ -32,6 +34,10 @@ int MouseY = 0;
 int lastI = 0;
 bool creating = false;
 bool ColourScheme = false;
+
+constexpr int numDivs = 8;
+
+std::array<std::future<bool>, numDivs> tasks;
 
 
 
@@ -85,6 +91,7 @@ Uint32 getColour(unsigned int it, double x)
 
 void CreateFractal(region r)
 {
+	//this legacy unused function is here for reference
 	if(creating == false)
 	{
 		lastI = 0;
@@ -133,8 +140,6 @@ void CreateFractal(region r)
 	
 }
 
-
-
 void paint()
 {
 	SDL_BlitSurface(frac,0,screen,0);
@@ -146,6 +151,76 @@ void paint()
 	SDL_Flip(screen);
 
 }
+
+
+auto fracGen = [](region r,int index, int numTasks, Uint32* pix, int h0)
+{
+
+	//Uint32* pix = (Uint32*)frac->pixels;
+	long double incX = std::abs((r.Rmax - r.Rmin)/frac->w);
+	long double incY = std::abs((r.Imax - r.Imin)/frac->h);
+	for(int i = h0;i < h0+10; i++)
+	{
+		if (i == frac->h)
+		{
+			return true;
+		}
+		for(int j = (index%numDivs)*(frac->w/numDivs); j< ((index%numDivs)+1)*(frac->w/numDivs); j++)
+		{
+
+			Uint8* p = (Uint8*)pix + (i * frac->pitch) + j*frac->format->BytesPerPixel;//Set initial pixel
+			long double x = r.Rmin+(j*incX);
+			long double y = r.Imax-(i*incY);
+			long double x0 = x;
+			long double y0 = y;
+
+			unsigned int iteration = 0;
+
+			while ( (x*x + y*y <= 4)  &&  (iteration < max_iteration) )
+			{
+				long double xtemp = x*x - y*y + x0;
+				y = 2*x*y + y0;
+
+				x = xtemp;
+
+				iteration++;
+			}
+
+			*(Uint32*) p = getColour(iteration, x);
+		}
+	}
+	return false;
+};
+
+void spawnTasks(region reg)
+{
+	creating = true;
+	static std::atomic<int> h {0};
+
+	SDL_LockSurface(frac);
+	for(uint i = 0; i < tasks.size(); i++)
+	{
+		tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), (Uint32*)frac->pixels,h.load());
+
+	}
+	h+= 10;
+
+	for(uint i = 0; i < tasks.size(); i++)
+	{
+		if(tasks[i].get())
+		{
+			h.store(0);
+			creating = false;
+		}
+	}
+	SDL_UnlockSurface(frac);
+
+
+
+
+}
+
+
 
 void onKeyboardEvent(const SDL_KeyboardEvent& ) 
 {
@@ -203,7 +278,8 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e )
 	{
 		//Middle Button
 		ColourScheme = !ColourScheme;
-		CreateFractal(reg);
+		//CreateFractal(reg);
+		spawnTasks(reg);
 		return;
 	}
 	if(e.button == 3)
@@ -213,7 +289,8 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e )
 		reg.Imin = -1.5;
 		reg.Rmax = 1;
 		reg.Rmin = -2;
-		CreateFractal(reg);
+		//CreateFractal(reg);
+		spawnTasks(reg);
 		return;
 	}
 	if(e.type == SDL_MOUSEBUTTONDOWN)
@@ -246,7 +323,8 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e )
 		reg.Imin = (y0>y1?y1:y0);
 
 		drawRect = false;
-		CreateFractal(reg);
+		//CreateFractal(reg);
+		spawnTasks(reg);
 	}
 
 }
@@ -314,15 +392,17 @@ int main (int , char**)
 	reg.Rmin = -2;
 
 
-	CreateFractal(reg);
+	//CreateFractal(reg);
+	spawnTasks(reg);
 	createHighlight();
 
 	while(!endProgram)
 	{
-		if (creating)
+		if(creating)
 		{
-			CreateFractal(reg);
+			spawnTasks(reg);
 		}
+
 		capture();
 		paint();
 	}
