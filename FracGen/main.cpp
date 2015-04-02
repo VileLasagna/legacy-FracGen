@@ -169,9 +169,9 @@ void paint() noexcept
 
 }
 
-
 auto fracGen = [](region r,int index, int numTasks, Uint32* pix, int h0) noexcept
 {
+    //std::cout << "tid: " << std::this_thread::get_id() << std::endl;
 
 	//Uint32* pix = (Uint32*)frac->pixels;
 	long double incX = std::abs((r.Rmax - r.Rmin)/frac->w);
@@ -182,7 +182,10 @@ auto fracGen = [](region r,int index, int numTasks, Uint32* pix, int h0) noexcep
 		{
 			return true;
 		}
-		for(int j = (index%numDivs)*(frac->w/numDivs); j< ((index%numDivs)+1)*(frac->w/numDivs); j++)
+        //Initially intuitive/illustrative division
+        //for(int j = (index%numDivs)*(frac->w/numDivs); j< ((index%numDivs)+1)*(frac->w/numDivs); j++)
+        //Newer prefetcher-friendly version
+        for(int j = 0 + index; j< frac->w; j+=numDivs)
 		{
 
 			Uint8* p = (Uint8*)pix + (i * frac->pitch) + j*frac->format->BytesPerPixel;//Set initial pixel
@@ -218,8 +221,8 @@ void spawnTasks(region reg) noexcept
 	for(uint i = 0; i < tasks.size(); i++)
 	{
         tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), (Uint32*)frac->pixels,h.load());
-
 	}
+
     h+= 10;
 
 	for(uint i = 0; i < tasks.size(); i++)
