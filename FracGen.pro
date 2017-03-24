@@ -76,6 +76,11 @@ CLANG = $$find(QMAKESPEC, clang* )
     !build_pass:message("Configured for windows")
 
 }
+else:\
+{
+    LIBS += -lSDL2 -lSDL2main -lpthread
+}
+
 
 #win32: LIBS += -L$$PWD/../../../libs/SDL-1.2.15/lib/ -llibSDL.dll
 
