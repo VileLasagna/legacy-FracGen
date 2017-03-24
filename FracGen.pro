@@ -13,6 +13,13 @@ CONFIG(debug, debug|release) \
     DESTDIR = $$_PRO_FILE_PWD_/distro/debug
 }
 
+CLANG = $$find(QMAKESPEC, clang* )
+!equals(CLANG, "") :\
+{
+    QMAKE_CXXFLAGS_WARN_ON = -Wall -Wno-ignored-qualifiers -Wno-missing-braces -Wno-unknown-pragmas
+    QMAKE_CXXFLAGS_WARN_ON += -Wno-macro-redefined -Wno-microsoft-exception-spec -Wno-missing-variable-declarations
+}
+
 SOURCES += \
     FracGen/main.cpp
 
@@ -50,12 +57,6 @@ win32:\
     SDL_PATH = "C:/Work/libs/SDL2-2.0.5/VC/"
     VC_LIBS_PATH = "C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC"
 
-CLANG = $$find(QMAKESPEC, clang* )
-!equals(CLANG, "") :\
-{
-    QMAKE_CXXFLAGS_WARN_ON = -Wall -Wno-ignored-qualifiers -Wno-missing-braces -Wno-unknown-pragmas
-    QMAKE_CXXFLAGS_WARN_ON += -Wno-macro-redefined -Wno-microsoft-exception-spec
-}
 
 #    LIBS += \
 #        -L"C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\lib\\amd64"                               \
