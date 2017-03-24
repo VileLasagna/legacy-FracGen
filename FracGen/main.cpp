@@ -19,10 +19,12 @@
 #include <array>
 #include <future>
 #include <chrono>
+#include <cfloat>
 
 
 struct region{long double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region in the Argand-Gauss Plane (R X I)
-bool operator==(const region& r1, const region& r2){return ( (r1.Imax == r2.Imax) && (r1.Imin == r2.Imin) && (r1.Rmax == r2.Rmax) && (r1.Rmin == r2.Rmin) );}
+bool operator==(const region& r1, const region& r2){return ( (r1.Imax - r2.Imax <= LDBL_EPSILON) && (r1.Imin - r2.Imin <= LDBL_EPSILON)
+														  && (r1.Rmax - r2.Rmax <= LDBL_EPSILON) && (r1.Rmin - r2.Rmin <= LDBL_EPSILON) );}
 
 region reg;
 SDL_Window* mainwindow;
