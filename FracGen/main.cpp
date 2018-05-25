@@ -20,6 +20,10 @@
 #include <future>
 #include <chrono>
 #include <cfloat>
+#include <numeric>
+#include <vector>
+#include <iostream>
+#include <fstream>
 
 
 struct region{long double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region in the Argand-Gauss Plane (R X I)
@@ -53,9 +57,10 @@ bool ColourScheme = false;
 auto genTime (std::chrono::high_resolution_clock::now());
 std::stringstream stream;
 
-constexpr int numDivs = 8;
+size_t numDivs = 24;
 
-std::array<std::future<bool>, numDivs> tasks;
+//std::array<std::future<bool>, numDivs> tasks;
+std::vector<std::future<bool>> tasks(numDivs);
 
 
 
@@ -94,7 +99,7 @@ Uint32 getColour(unsigned int it/*, double x*/) noexcept
 
 	if (ColourScheme)
 	{
-		//HELL YEAH EXPENSIVE MATHS!!
+        //GO GO DUMB MATHS!!
 		//Aproximate range: From 0.3 to 1018 and then infinity (O.o)
 //		long double index = it + (log(2*(log(Bailout))) - (log(log(std::abs(x)))))/log(power);
 //		return SDL_MapRGB(frac->format, (sin(index))*255, (sin(index+50))*255, (sin(index+100))*255);
@@ -232,7 +237,7 @@ auto fracGen = [](region r,int index, Uint32* pix, int h0) noexcept
 	return false;
 };
 
-void spawnTasks(region reg) noexcept
+void spawnTasks(region reg, bool bench) noexcept
 {
 	creating = true;
 	static std::atomic<int> h {0};
@@ -256,6 +261,10 @@ void spawnTasks(region reg) noexcept
 			stream << "Fractal Generation Took " << d << " milliseconds";
 			SDL_SetWindowTitle(mainwindow, stream.str().c_str());
 			stream.str("");
+            if(bench)
+            {
+                endProgram = true;
+            }
 		}
 	}
 	SDL_UnlockSurface(frac);
@@ -324,7 +333,7 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e ) noexcept
 		ColourScheme = !ColourScheme;
 		//CreateFractal(reg);
         genTime = std::chrono::high_resolution_clock::now();
-		spawnTasks(reg);
+        spawnTasks(reg, false);
 		return;
 	}
 	if(e.button == 3)
@@ -336,7 +345,7 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e ) noexcept
 		reg.Rmin = -2;
 		//CreateFractal(reg);
         genTime = std::chrono::high_resolution_clock::now();
-		spawnTasks(reg);
+        spawnTasks(reg, false);
 		return;
 	}
 	if(e.type == SDL_MOUSEBUTTONDOWN)
@@ -371,7 +380,7 @@ void onMouseButtonEvent(const SDL_MouseButtonEvent& e ) noexcept
 		drawRect = false;
 		//CreateFractal(reg);
         genTime = std::chrono::high_resolution_clock::now();
-		spawnTasks(reg);
+        spawnTasks(reg, false);
 	}
 
 }
@@ -422,7 +431,7 @@ void capture() noexcept
 
 
 
-int main (int , char**) noexcept
+int runProgram(bool benching) noexcept
 {
 	endProgram = false;
 	SDL_Init(SDL_INIT_EVERYTHING);
@@ -465,20 +474,167 @@ int main (int , char**) noexcept
 
 	//CreateFractal(reg);
     genTime = std::chrono::high_resolution_clock::now();
-	spawnTasks(reg);
+    spawnTasks(reg, benching);
 	createHighlight();
 
 	while(!endProgram)
 	{
 		if(creating)
 		{
-			spawnTasks(reg);
+            spawnTasks(reg, benching);
 		}
 
-		capture();
+        if(!benching)
+        {
+            capture();
+        }
 		paint();
 	}
 
 	return 0;
+}
+
+void printUsage()
+{
+    std::vector<std::string> help
+    {
+        "Fracgen is a toy mandelbrot fractal generator you can use for silly CPU benchmarks",
+        "If you just want to look at some fractals, just run it plain",
+        "Drag boxes with Mouse1 to select region of interest, Mouse2 switches colour scheme",
+        "Mouse 3 resets the image to the original area",
+        "",
+        "Run from the cli for toy benchmarking",
+        "Available options",
+        "    -i X",
+        "        Number of interactions to run",
+        "    -j X",
+        "        Number of parallel tasks to run",
+        "    -o X",
+        "        Output results to a file"
+
+    };
+    for(std::string h: help)
+    {
+        std::cout << h << std::endl;
+    }
+}
+
+int main (int argc, char** argv) noexcept
+{
+    int res = 0;
+    size_t iterations = 1;
+    std::ofstream outlog;
+    auto numThreads = std::thread::hardware_concurrency();
+    if(numThreads > 0)
+    {
+        // This 4 is an experimental factor. It feels like a sweet spot
+        // I don't know why and never chased this but it's been true
+        // across Bulldozer, Skylake and Threadripper
+        numDivs=numThreads*4;
+        tasks.resize(numDivs);
+    }
+
+    enum class setting{NONE, ITERATIONS, JOBS, OUTPUT};
+
+    if(argc > 1)
+    {
+        auto op = setting::NONE;
+        for(int a = 1; a < argc; a++)
+        {
+            std::string token(argv[a]);
+            if(token == "-i")
+            {
+                    op = setting::ITERATIONS;
+                    continue;
+            }
+            if(token == "-j")
+            {
+                    op = setting::JOBS;
+                    continue;
+            }
+            if(token == "-o")
+            {
+                    op = setting::OUTPUT;
+                    continue;
+            }
+            if((token == "-h") || (token == "--h"))
+            {
+                printUsage();
+                return 0;
+            }
+
+            //No exceptions here, only undefined behaviour
+            int n = atoi(argv[a]);
+            switch(op)
+            {
+                case setting::ITERATIONS:
+                    iterations = n;
+                    op = setting::NONE;
+                    break;
+                case setting::JOBS:
+                    numDivs = n;
+                    tasks.resize(numDivs);
+                    op = setting::NONE;
+                    break;
+                case setting::OUTPUT:
+                    outlog.open(argv[a]);
+                    if(outlog.fail())
+                    {
+                        std::cout << "Could not open file " << argv[a] << " for output";
+                        return 1;
+                    }
+                    op = setting::NONE;
+                    break;
+                default:
+                    break;
+            }
+
+
+        }
+
+        std::cout << "Preparing to run with "<< numDivs << " parallel tasks" << std::endl;
+        if(outlog.is_open())
+        {
+            outlog << "Preparing to run with "<< numDivs << " parallel tasks" << std::endl;
+        }
+    }
+    if(iterations > 1)
+    {
+        std::vector<size_t> results;
+        for(size_t i = 0; i < iterations; i++)
+        {
+            res = runProgram(true);
+            if(res != 0)
+            {
+                return res;
+            }
+            auto d = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - genTime).count();
+            std::cout << "Iteration " << i << " took " << d << " milliseconds" << std::endl;
+            if(outlog.is_open())
+            {
+                outlog << "Iteration " << i << " took " << d << " milliseconds" << std::endl;
+            }
+            results.push_back(d);
+        }
+        auto avg = std::accumulate(results.begin(), results.end(), 0)/ results.size();
+
+        std::cout << std::endl << "Average time of " << avg << " milliseconds (over " << results.size()<< " tests)"<< std::endl;
+        if(outlog.is_open())
+        {
+            outlog << std::endl << "Average time of " << avg << " milliseconds (over " << results.size()<< " tests)"<< std::endl;
+        }
+    }
+    else
+    {
+        res = runProgram(false);
+    }
+
+    if(outlog.is_open())
+    {
+        outlog.flush();
+        outlog.close();
+    }
+
+    return res;
 }
 
