@@ -9,6 +9,8 @@ set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/redist)
 add_executable(${PROJECT_NAME}    "FracGen/main.cpp")
 add_executable(${PROJECT_NAME}MPI "FracGenMPI/main.cpp")
 
+target_compile_features(${PROJECT_NAME}MPI PUBLIC cxx_std_14)
+
 
 target_link_libraries(${PROJECT_NAME}    SDL2)
 target_link_libraries(${PROJECT_NAME}MPI SDL2)

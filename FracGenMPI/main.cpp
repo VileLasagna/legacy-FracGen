@@ -13,6 +13,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <cmath>
 
 #include <mpi.h>
 #include <png.h>
@@ -23,7 +24,7 @@ struct region{long double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region
 bool operator==(const region& r1, const region& r2){return ( (r1.Imax - r2.Imax <= LDBL_EPSILON) && (r1.Imin - r2.Imin <= LDBL_EPSILON)
 														  && (r1.Rmax - r2.Rmax <= LDBL_EPSILON) && (r1.Rmin - r2.Rmin <= LDBL_EPSILON) );}
 
-region reg;
+region reg, myReg;
 bool endProgram;
 unsigned int iteration_factor = 100;
 unsigned int max_iteration = 256 * iteration_factor;
@@ -36,75 +37,94 @@ bool ColourScheme = false;
 auto genTime (std::chrono::high_resolution_clock::now());
 std::stringstream stream;
 
-int myrank = 0;
-int nprocs = 0;
+int myrank = 1;
+int nprocs = 1;
 size_t numDivs = 3;
+int realDivs = 0;
+int imDivs = 0;
 
-png_byte color_type;
+using pngColourType = png_byte;
+
+pngColourType color_type;
 png_byte bit_depth;
 png_bytep *row_pointers;
 
+png_structp pngWritePtr = nullptr;
+png_infop pngInfoPtr = nullptr;
+png_bytep row = nullptr;
 //std::array<std::future<bool>, numDivs> tasks;
 std::vector<std::future<bool>> tasks(numDivs);
 
+FILE* fp;
 
 
-
-
-
-
-unsigned int getColour(unsigned int it/*, double x*/) noexcept
+struct pngRGB
 {
-	
+    pngColourType r;
+    pngColourType g;
+    pngColourType b;
+};
+
+std::vector<std::vector<pngRGB> > pngRows;
+
+
+pngRGB getColour(unsigned int it, unsigned int div) noexcept
+{
+    pngRGB colour;
 
 	if (ColourScheme)
 	{
-        //GO GO DUMB MATHS!!
-		//Aproximate range: From 0.3 to 1018 and then infinity (O.o)
-//		long double index = it + (log(2*(log(Bailout))) - (log(log(std::abs(x)))))/log(power);
-//		return SDL_MapRGB(frac->format, (sin(index))*255, (sin(index+50))*255, (sin(index+100))*255);
-        return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
+        colour.r = 128 + std::sin((float)it + 1)*128;
+        colour.g = 128 + std::sin((float)it)*128;
+        colour.b = std::cos((float)it+1.5)*255;
 	}
 	else
 	{
-        //std::cout<< it <<std::endl;
-
-        //return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
         if(it == max_iteration)
         {
-            return SDL_MapRGB(frac->format, 0, 0 , 0);
+            colour.r = 0;
+            colour.g = 0;
+            colour.b = 0;
         }
         else
         {
-			//auto b = std::min(it,255u);
-            return SDL_MapRGB(frac->format, std::min(it,255u) , 0, std::min(it,255u) );
-            //return SDL_MapRGB(frac->format, 128+ sin((float)it + 1)*128, 128 + sin((float)it)*128 ,  cos((float)it+1.5)*255);
+            colour.r = std::min(it,255u);
+            colour.g = std::min(it,255u);
+            colour.b = std::min(it,255u);
+            switch (div % 3)
+            {
+                case 0: colour.r = 0; break;
+                case 1: colour.g = 0; break;
+                case 2: colour.b = 0; break;
+            }
         }
 	}
-
+    return colour;
 }
 
 
-auto fracGen = [](region r,int index, Uint32* pix) noexcept
+auto fracGen = [](region r,int index, int numTasks, std::vector<std::vector<pngRGB> >* rows) noexcept
 {
-    //std::cout << "tid: " << std::this_thread::get_id() << std::endl;
+    if (rows == nullptr)
+    {
+        return false;
+    }
+    size_t pixHeight = rows->size();
+    size_t pixWidth = rows->at(0).size();
 
-	//Uint32* pix = (Uint32*)frac->pixels;
-	long double incX = std::abs((r.Rmax - r.Rmin)/frac->w);
-	long double incY = std::abs((r.Imax - r.Imin)/frac->h);
-    for(int i = 0;i < height; i++)
+    long double incX = std::abs((r.Rmax - r.Rmin)/pixWidth);
+    long double incY = std::abs((r.Imax - r.Imin)/pixHeight);
+
+    for(int i = index * pixHeight/numTasks; i < (index + 1) * pixHeight/numTasks; i++)
 	{
-		if (i == frac->h)
+        if (i == rows->size())
 		{
 			return true;
 		}
-        //Initially intuitive/illustrative division
-        //for(int j = (index%numDivs)*(frac->w/numDivs); j< ((index%numDivs)+1)*(frac->w/numDivs); j++)
-        //Newer prefetcher-friendly version
-        for(int j = 0 + index; j< frac->w; j+=numDivs)
+
+        for(int j = 0; j < pixWidth; j++)
 		{
 
-			Uint8* p = (Uint8*)pix + (i * frac->pitch) + j*frac->format->BytesPerPixel;//Set initial pixel
 			long double x = r.Rmin+(j*incX);
 			long double y = r.Imax-(i*incY);
 			long double x0 = x;
@@ -122,7 +142,7 @@ auto fracGen = [](region r,int index, Uint32* pix) noexcept
 				iteration++;
 			}
 
-			*(Uint32*) p = getColour(iteration/*, x*/);
+            rows->at(i)[j] = getColour(iteration, index);
 		}
 	}
 	return false;
@@ -133,12 +153,12 @@ void spawnTasks(region reg, bool bench) noexcept
 
     for(unsigned int i = 0; i < tasks.size(); i++)
 	{
-        tasks[i] = std::async(std::launch::async, fracGen,reg, i, /*tasks.size(),*/ (Uint32*)frac->pixels);
+        tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), &pngRows);
 	}
-
 
     for(unsigned int i = 0; i < tasks.size(); i++)
 	{
+        //block until all tasks are done
 		if(tasks[i].get())
 		{
 			auto d = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - genTime).count();
@@ -150,38 +170,6 @@ void spawnTasks(region reg, bool bench) noexcept
 
 int runProgram(bool benching) noexcept
 {
-	endProgram = false;
-	SDL_Init(SDL_INIT_EVERYTHING);
-//	screen = SDL_SetVideoMode(w,h,bpp, SDL_HWSURFACE|SDL_DOUBLEBUF|SDL_ASYNCBLIT);
-	mainwindow = SDL_CreateWindow("Mandelbrot Fractal Explorer - Use Mouse1 to zoom in and Mouse2 to zoom out. Press Mouse 3 to change colouring scheme",
-							  SDL_WINDOWPOS_UNDEFINED,
-							  SDL_WINDOWPOS_UNDEFINED,
-							  w, h,
-							  SDL_WINDOW_SHOWN);
-
-	render = SDL_CreateRenderer(mainwindow, -1, 0);
-
-	screen = SDL_CreateRGBSurface(0, w, h, bpp,
-									0x00FF0000,
-									0x0000FF00,
-									0x000000FF,
-									0xFF000000);
-
-	texture = SDL_CreateTexture(render,
-								SDL_PIXELFORMAT_ARGB8888,
-								SDL_TEXTUREACCESS_STREAMING,
-								w, h);
-	assert(screen);
-//	SDL_WM_SetCaption("Mandelbrot Fractal Explorer - Use Mouse1 to zoom in and Mouse2 to zoom out. Press Mouse 3 to change colouring scheme",0);
-	SDL_SetWindowTitle(mainwindow, "Mandelbrot Fractal Explorer - Use Mouse1 to zoom in and Mouse2 to zoom out. Press Mouse 3 to change colouring scheme");
-
-	//frac =	SDL_CreateRGBSurface(SDL_HWSURFACE|SDL_DOUBLEBUF|SDL_ASYNCBLIT,w,h,bpp,0,0,0,0);
-	frac = SDL_CreateRGBSurface(0, w, h, bpp,
-								0x00FF0000,
-								0x0000FF00,
-								0x000000FF,
-								0xFF000000);
-
 	
 	reg.Imax = 1.5;
 	reg.Imin = -1.5;
@@ -192,48 +180,100 @@ int runProgram(bool benching) noexcept
 	//CreateFractal(reg);
     genTime = std::chrono::high_resolution_clock::now();
     spawnTasks(reg, benching);
-	createHighlight();
 
-	while(!endProgram)
-	{
-		if(creating)
-		{
-            spawnTasks(reg, benching);
-		}
 
-        if(!benching)
-        {
-            capture();
-        }
-		paint();
-	}
+    spawnTasks(reg, benching);
 
 	return 0;
 }
 
-void printUsage()
+void allocRows()
 {
-    std::vector<std::string> help
+    pngRows.resize(height);
+    for(auto& v: pngRows)
     {
-        "Fracgen is a toy mandelbrot fractal generator you can use for silly CPU benchmarks",
-        "If you just want to look at some fractals, just run it plain",
-        "Drag boxes with Mouse1 to select region of interest, Mouse2 switches colour scheme",
-        "Mouse 3 resets the image to the original area",
-        "",
-        "Run from the cli for toy benchmarking",
-        "Available options",
-        "    -i X",
-        "        Number of interactions to run",
-        "    -j X",
-        "        Number of parallel tasks to run",
-        "    -o X",
-        "        Output results to a file"
-
-    };
-    for(std::string h: help)
-    {
-        std::cout << h << std::endl;
+        v.resize(width);
     }
+}
+
+int initPNG(int rank, int procs)
+{
+    //std::string filename("/mnt/pandora/storage/users/jehferson/FracGenOut/FracGenMPI");
+    std::string filename("FracGenOut/FracGenMPI");
+    filename.append(std::to_string(myrank));
+    filename.append(".png");
+
+    fp = fopen(filename.c_str(), "wb");
+    if (fp == NULL)
+    {
+        std::cerr << "Could not open file " << filename << " for writing" << std::endl;
+        return 1;
+    }
+
+
+    // Initialize PNG write structure
+    pngWritePtr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (pngWritePtr == nullptr)
+    {
+        std::cerr << "Could not allocate PNG write struct" << std::endl;
+        return 2;
+    }
+
+    // Initialize info structure
+    pngInfoPtr = png_create_info_struct(pngWritePtr);
+    if (pngInfoPtr == nullptr)
+    {
+        std::cerr << "Could not allocate PNG info struct" << std::endl;
+        return 2;
+    }
+
+    png_init_io(pngWritePtr, fp);
+
+    // Write header (8 bit colour depth)
+    png_set_IHDR(pngWritePtr, pngInfoPtr, width, height,
+    8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+    PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+
+
+    std::string title = "FracGenMPI Mandelbrot section ";
+    title.append(std::to_string(rank));
+    title.append(" of ");
+    title.append(std::to_string(procs));
+    char ctitle[256];
+    for(char& c: ctitle)
+    {
+        c = 0;
+    }
+    title.copy(ctitle,title.length(),0);
+
+    png_text title_text;
+    title_text.compression = PNG_TEXT_COMPRESSION_NONE;
+    title_text.key = "Title";
+    title_text.text = ctitle;
+    title_text.text_length = title.size();
+    png_set_text(pngWritePtr, pngInfoPtr, &title_text, 1);
+
+
+    png_write_info(pngWritePtr, pngInfoPtr);
+
+    allocRows();
+
+    return 0;
+}
+
+int writePNG()
+{
+    int res = 0;
+    // Write image data
+    int x, y;
+    for (auto row : pngRows)
+    {
+       png_write_row(pngWritePtr, reinterpret_cast<png_const_bytep>(row.data()) );
+    }
+
+    // End write
+    png_write_end(pngWritePtr, NULL);
+    return res;
 }
 
 int main (int argc, char** argv) noexcept
@@ -243,25 +283,32 @@ int main (int argc, char** argv) noexcept
     MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
 
-    int res = 0;
-    std::ofstream outlog;
-    auto numThreads = std::thread::hardware_concurrency();
-    if(numThreads > 0)
+    if(nprocs == 0 )
     {
-        // This 4 is an experimental factor. It feels like a sweet spot
-        // I don't know why and never chased this but it's been true
-        // across Bulldozer, Skylake and Threadripper
-        numDivs=numThreads*4;
-        tasks.resize(numDivs);
+        myrank = 1;
+        nprocs = 1;
     }
 
+    int res = 0;
+    std::ofstream outlog;
 
-    res = runProgram(false);
+    allocRows();
+    res = initPNG(myrank,nprocs);
+
+    if( res == 0)
+    {
+        res = runProgram(false);
+    }
 
     if(outlog.is_open())
     {
         outlog.flush();
         outlog.close();
+    }
+
+    if(res == 0)
+    {
+        res = writePNG();
     }
 
     MPI_Finalize();
