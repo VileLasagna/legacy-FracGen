@@ -24,7 +24,8 @@ struct region{long double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region
 bool operator==(const region& r1, const region& r2){return ( (r1.Imax - r2.Imax <= LDBL_EPSILON) && (r1.Imin - r2.Imin <= LDBL_EPSILON)
 														  && (r1.Rmax - r2.Rmax <= LDBL_EPSILON) && (r1.Rmin - r2.Rmin <= LDBL_EPSILON) );}
 
-region reg, myReg;
+region reg {-1.5,1.5,-2,2};
+region myReg {reg};
 bool endProgram;
 unsigned int iteration_factor = 100;
 unsigned int max_iteration = 256 * iteration_factor;
@@ -68,7 +69,7 @@ struct pngRGB
 std::vector<std::vector<pngRGB> > pngRows;
 
 
-pngRGB getColour(unsigned int it, unsigned int div) noexcept
+pngRGB getColour(unsigned int it, unsigned int rank) noexcept
 {
     pngRGB colour;
 
@@ -91,11 +92,17 @@ pngRGB getColour(unsigned int it, unsigned int div) noexcept
             colour.r = std::min(it,255u);
             colour.g = std::min(it,255u);
             colour.b = std::min(it,255u);
-            switch (div % 3)
+
+            //let's make it a bit fun
+            switch (rank % 7)
             {
-                case 0: colour.r = 0; break;
-                case 1: colour.g = 0; break;
-                case 2: colour.b = 0; break;
+                case 0: colour.r = 0;                             break;
+                case 1:               colour.g = 0;               break;
+                case 2:                             colour.b = 0; break;
+                case 3:               colour.g = 0; colour.b = 0; break;
+                case 4: colour.r = 0;               colour.b = 0; break;
+                case 5: colour.r = 0; colour.g = 0;               break;
+                case 6: break;
             }
         }
 	}
@@ -103,7 +110,7 @@ pngRGB getColour(unsigned int it, unsigned int div) noexcept
 }
 
 
-auto fracGen = [](region r,int index, int numTasks, std::vector<std::vector<pngRGB> >* rows) noexcept
+auto fracGen = [](region r,int index, int numTasks, int rank, std::vector<std::vector<pngRGB> >* rows) noexcept
 {
     if (rows == nullptr)
     {
@@ -142,7 +149,7 @@ auto fracGen = [](region r,int index, int numTasks, std::vector<std::vector<pngR
 				iteration++;
 			}
 
-            rows->at(i)[j] = getColour(iteration, index);
+            rows->at(i)[j] = getColour(iteration, rank);
 		}
 	}
 	return false;
@@ -150,10 +157,12 @@ auto fracGen = [](region r,int index, int numTasks, std::vector<std::vector<pngR
 
 void spawnTasks(region reg, bool bench) noexcept
 {
+    std::cout << "Task " << myrank << " of " << nprocs << " drawing region: ";
+    std::cout << myReg.Imin << "i -> " << myReg.Imax << "i // " << myReg.Rmin << " -> " << myReg.Rmax << std::endl;
 
     for(unsigned int i = 0; i < tasks.size(); i++)
 	{
-        tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), &pngRows);
+        tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), myrank, &pngRows);
 	}
 
     for(unsigned int i = 0; i < tasks.size(); i++)
@@ -170,19 +179,9 @@ void spawnTasks(region reg, bool bench) noexcept
 
 int runProgram(bool benching) noexcept
 {
-	
-	reg.Imax = 1.5;
-	reg.Imin = -1.5;
-	reg.Rmax = 1;
-	reg.Rmin = -2;
-
-
 	//CreateFractal(reg);
     genTime = std::chrono::high_resolution_clock::now();
-    spawnTasks(reg, benching);
-
-
-    spawnTasks(reg, benching);
+    spawnTasks(myReg, benching);
 
 	return 0;
 }
@@ -199,7 +198,8 @@ void allocRows()
 int initPNG(int rank, int procs)
 {
     //std::string filename("/mnt/pandora/storage/users/jehferson/FracGenOut/FracGenMPI");
-    std::string filename("FracGenOut/FracGenMPI");
+    //std::string filename("FracGenOut/FracGenMPI");
+    std::string filename("FracGenMPI");
     filename.append(std::to_string(myrank));
     filename.append(".png");
 
@@ -276,6 +276,54 @@ int writePNG()
     return res;
 }
 
+void defineRegion(unsigned int rank, unsigned int procs)
+{
+    region cropped;
+    //find the closest square
+    int p = procs;
+    int r = sqrt(p);
+    while( (r*r) != p )
+    {
+        p -= 1;
+        r = sqrt(p);
+    }
+    int left = procs % p;
+    if(rank == 1)
+    {
+        std::cout << "From " << procs << " tasks we have a " << r << "x" << r << " + " << left << " area " << std::endl;
+    }
+    //we have R*R + left processes;
+    long double imStep = (reg.Imax - reg.Imin) / r;
+    long double imStepover = 0;
+    long double rStep = (reg.Rmax - reg.Rmin) / r;
+    if(left != 0)
+    {
+        rStep = (reg.Rmax - reg.Rmin) / (r + 1);
+        imStepover = (reg.Imax - reg.Imin) / left;
+    }
+
+    if(rank < r*r)
+    {
+        myReg.Imax = reg.Imax - (imStep*(rank/r));
+        myReg.Imin = myReg.Imax - imStep;
+
+        myReg.Rmin = reg.Rmin + (rStep* (rank%r));
+        myReg.Rmax = myReg.Rmin + rStep;
+    }
+    else
+    {
+        myReg.Imax = reg.Imax - (imStepover*(rank%r));
+        myReg.Imin = myReg.Imax - imStepover;
+
+        myReg.Rmin = reg.Rmin + (rStep * r);
+        myReg.Rmax = myReg.Rmin + rStep;
+
+        height = height * imStepover / imStep;
+
+    }
+
+}
+
 int main (int argc, char** argv) noexcept
 {
 
@@ -285,9 +333,11 @@ int main (int argc, char** argv) noexcept
 
     if(nprocs == 0 )
     {
-        myrank = 1;
+        myrank = 0;
         nprocs = 1;
     }
+
+    defineRegion(myrank,nprocs);
 
     int res = 0;
     std::ofstream outlog;
