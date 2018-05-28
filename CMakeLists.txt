@@ -7,7 +7,9 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/redist)
 
 add_executable(${PROJECT_NAME}    "FracGen/main.cpp")
-add_executable(${PROJECT_NAME}MPI "FracGenMPI/main.cpp")
+add_executable(${PROJECT_NAME}MPI "FracGenMPI/main.cpp"
+                                  "FracGenMPI/pngWriter.h"
+                                  "FracGenMPI/pngWriter.cpp")
 
 target_compile_features(${PROJECT_NAME}MPI PUBLIC cxx_std_14)
 

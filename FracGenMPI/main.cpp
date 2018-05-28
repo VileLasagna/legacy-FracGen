@@ -16,7 +16,7 @@
 #include <cmath>
 
 #include <mpi.h>
-#include <png.h>
+#include "pngWriter.h"
 
 
 
@@ -36,7 +36,6 @@ int height = 720;
 int lastI = 0;
 bool ColourScheme = false;
 auto genTime (std::chrono::high_resolution_clock::now());
-std::stringstream stream;
 
 int myrank = 1;
 int nprocs = 1;
@@ -44,27 +43,13 @@ size_t numDivs = 3;
 int realDivs = 0;
 int imDivs = 0;
 
-using pngColourType = png_byte;
 
-pngColourType color_type;
-png_byte bit_depth;
-png_bytep *row_pointers;
 
-png_structp pngWritePtr = nullptr;
-png_infop pngInfoPtr = nullptr;
 png_bytep row = nullptr;
 //std::array<std::future<bool>, numDivs> tasks;
 std::vector<std::future<bool>> tasks(numDivs);
 
-FILE* fp;
 
-
-struct pngRGB
-{
-    pngColourType r;
-    pngColourType g;
-    pngColourType b;
-};
 
 std::vector<std::vector<pngRGB> > pngRows;
 
@@ -186,96 +171,6 @@ int runProgram(bool benching) noexcept
 	return 0;
 }
 
-void allocRows()
-{
-    pngRows.resize(height);
-    for(auto& v: pngRows)
-    {
-        v.resize(width);
-    }
-}
-
-int initPNG(int rank, int procs)
-{
-    //std::string filename("/mnt/pandora/storage/users/jehferson/FracGenOut/FracGenMPI");
-    //std::string filename("FracGenOut/FracGenMPI");
-    std::string filename("FracGenMPI");
-    filename.append(std::to_string(myrank));
-    filename.append(".png");
-
-    fp = fopen(filename.c_str(), "wb");
-    if (fp == NULL)
-    {
-        std::cerr << "Could not open file " << filename << " for writing" << std::endl;
-        return 1;
-    }
-
-
-    // Initialize PNG write structure
-    pngWritePtr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    if (pngWritePtr == nullptr)
-    {
-        std::cerr << "Could not allocate PNG write struct" << std::endl;
-        return 2;
-    }
-
-    // Initialize info structure
-    pngInfoPtr = png_create_info_struct(pngWritePtr);
-    if (pngInfoPtr == nullptr)
-    {
-        std::cerr << "Could not allocate PNG info struct" << std::endl;
-        return 2;
-    }
-
-    png_init_io(pngWritePtr, fp);
-
-    // Write header (8 bit colour depth)
-    png_set_IHDR(pngWritePtr, pngInfoPtr, width, height,
-    8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
-    PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-
-
-    std::string title = "FracGenMPI Mandelbrot section ";
-    title.append(std::to_string(rank));
-    title.append(" of ");
-    title.append(std::to_string(procs));
-    char ctitle[256];
-    for(char& c: ctitle)
-    {
-        c = 0;
-    }
-    title.copy(ctitle,title.length(),0);
-
-    png_text title_text;
-    title_text.compression = PNG_TEXT_COMPRESSION_NONE;
-    title_text.key = "Title";
-    title_text.text = ctitle;
-    title_text.text_length = title.size();
-    png_set_text(pngWritePtr, pngInfoPtr, &title_text, 1);
-
-
-    png_write_info(pngWritePtr, pngInfoPtr);
-
-    allocRows();
-
-    return 0;
-}
-
-int writePNG()
-{
-    int res = 0;
-    // Write image data
-    int x, y;
-    for (auto row : pngRows)
-    {
-       png_write_row(pngWritePtr, reinterpret_cast<png_const_bytep>(row.data()) );
-    }
-
-    // End write
-    png_write_end(pngWritePtr, NULL);
-    return res;
-}
-
 void defineRegion(unsigned int rank, unsigned int procs)
 {
     region cropped;
@@ -337,13 +232,15 @@ int main (int argc, char** argv) noexcept
         nprocs = 1;
     }
 
+    pngWriter writer(4096,1920);
+    writer.Init();
+    writer.Alloc(pngRows);
     defineRegion(myrank,nprocs);
+
 
     int res = 0;
     std::ofstream outlog;
 
-    allocRows();
-    res = initPNG(myrank,nprocs);
 
     if( res == 0)
     {
@@ -358,7 +255,7 @@ int main (int argc, char** argv) noexcept
 
     if(res == 0)
     {
-        res = writePNG();
+        writer.Write(pngRows);
     }
 
     MPI_Finalize();
