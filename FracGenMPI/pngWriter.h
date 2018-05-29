@@ -13,7 +13,9 @@ struct pngRGB
     pngColourType b;
 };
 
-using pngData = std::vector<std::vector<pngRGB>>;
+using pngData = std::vector<pngRGB>;
+using pngData2d = std::vector<pngData>;
+
 
 class pngWriter
 {
@@ -25,8 +27,10 @@ class pngWriter
         void setHeight(unsigned int height) noexcept {h = height;}
 
         bool Init();
-        bool Write(const pngData& rows);
-        void Alloc(pngData& rows);
+        bool Write(const pngData& data);
+        bool Write(const pngData2d& rows);
+        void Alloc(pngData& data);
+        void Alloc(pngData2d& rows);
 
     private:
 

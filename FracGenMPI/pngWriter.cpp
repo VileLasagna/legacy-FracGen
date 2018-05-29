@@ -72,7 +72,21 @@ bool pngWriter::Init()
     return 0;
 }
 
-bool pngWriter::Write(const pngData& rows)
+bool pngWriter::Write(const pngData& data)
+{
+    // Write image data
+    for (int row = 0; row < h; row ++)
+    {
+       png_write_row(writePtr, reinterpret_cast<png_const_bytep>(data.data()+(row*w)) );
+    }
+
+    // End write
+    png_write_end(writePtr, nullptr);
+    //check for error here
+    return true;
+}
+
+bool pngWriter::Write(const pngData2d& rows)
 {
     // Write image data
     for (auto row : rows)
@@ -86,7 +100,12 @@ bool pngWriter::Write(const pngData& rows)
     return true;
 }
 
-void pngWriter::Alloc(pngData& rows)
+void pngWriter::Alloc(pngData& data)
+{
+    data.resize(h*w);
+}
+
+void pngWriter::Alloc(pngData2d& rows)
 {
     rows.resize(h);
     for(auto& v: rows)
@@ -94,4 +113,5 @@ void pngWriter::Alloc(pngData& rows)
         v.resize(w);
     }
 }
+
 
