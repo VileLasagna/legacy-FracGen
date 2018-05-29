@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <iostream>
 
-pngWriter::pngWriter(unsigned int width, unsigned int height)
+pngWriter::pngWriter(uint32_t width, uint32_t height)
     :w{width},
      h{height},
      bit_depth{32},

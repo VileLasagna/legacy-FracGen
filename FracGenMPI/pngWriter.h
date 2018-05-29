@@ -2,8 +2,9 @@
 #define PNGWRITER_H_DEFINED
 #include <png.h>
 #include <vector>
+#include <cstdint>
 
-using pngColourType = png_byte;
+using pngColourType = png_uint_32;
 
 struct pngRGB
 {
@@ -18,7 +19,7 @@ class pngWriter
 {
     public:
 
-        pngWriter(unsigned int width = 0, unsigned int height = 0);
+        pngWriter(uint32_t width = 0, uint32_t height = 0);
 
         void setWidth(unsigned int width)   noexcept {w = width;}
         void setHeight(unsigned int height) noexcept {h = height;}
@@ -29,7 +30,7 @@ class pngWriter
 
     private:
 
-        unsigned int w, h;
+        uint32_t w, h;
 
         png_byte bit_depth;
         png_structp writePtr;
