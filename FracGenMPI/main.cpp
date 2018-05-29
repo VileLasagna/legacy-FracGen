@@ -14,6 +14,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <cstdint>
 
 #include <mpi.h>
 #include "pngWriter.h"
@@ -31,8 +32,6 @@ unsigned int iteration_factor = 100;
 unsigned int max_iteration = 256 * iteration_factor;
 long double Bailout = 2;
 long double power = 2;
-int width =	1280;
-int height = 720;
 int lastI = 0;
 bool ColourScheme = false;
 auto genTime (std::chrono::high_resolution_clock::now());
@@ -48,10 +47,6 @@ int imDivs = 0;
 png_bytep row = nullptr;
 //std::array<std::future<bool>, numDivs> tasks;
 std::vector<std::future<bool>> tasks(numDivs);
-
-
-
-std::vector<std::vector<pngRGB> > pngRows;
 
 
 pngRGB getColour(unsigned int it, unsigned int rank) noexcept
@@ -147,7 +142,7 @@ void spawnTasks(region reg, bool bench) noexcept
 
     for(unsigned int i = 0; i < tasks.size(); i++)
 	{
-        tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), myrank, &pngRows);
+        //tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), myrank, &pngRows);
 	}
 
     for(unsigned int i = 0; i < tasks.size(); i++)
@@ -213,7 +208,7 @@ void defineRegion(unsigned int rank, unsigned int procs)
         myReg.Rmin = reg.Rmin + (rStep * r);
         myReg.Rmax = myReg.Rmin + rStep;
 
-        height = height * imStepover / imStep;
+        //height = height * imStepover / imStep;
 
     }
 
@@ -226,15 +221,40 @@ int main (int argc, char** argv) noexcept
     MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
 
+
+
     if(nprocs == 0 )
     {
         myrank = 0;
         nprocs = 1;
     }
 
-    pngWriter writer(4096,1920);
-    writer.Init();
-    writer.Alloc(pngRows);
+    int closestSqrt = nprocs;
+    int r = static_cast<int>(sqrt(closestSqrt));
+    while( (r*r) != closestSqrt )
+    {
+        closestSqrt -= 1;
+        r = static_cast<int>(sqrt(closestSqrt));
+    }
+
+    uint32_t height = 1920 * closestSqrt;
+    uint32_t width  = 4096 * closestSqrt;
+
+
+    std::vector<pngRGB> pngRows;
+
+    pngWriter writer(0,0);
+
+    //root process behaviour
+    if(myrank == 0)
+    {
+        writer.setHeight(height);
+        writer.setWidth(width);
+        writer.Init();
+        writer.Alloc(pngRows);
+    }
+
+
     defineRegion(myrank,nprocs);
 
 
