@@ -25,7 +25,7 @@ struct region{long double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region
 bool operator==(const region& r1, const region& r2){return ( (r1.Imax - r2.Imax <= LDBL_EPSILON) && (r1.Imin - r2.Imin <= LDBL_EPSILON)
 														  && (r1.Rmax - r2.Rmax <= LDBL_EPSILON) && (r1.Rmin - r2.Rmin <= LDBL_EPSILON) );}
 
-region reg {-1.5,1.5,-2,2};
+region reg {-1.5,1.5,-2,1};
 region myReg {reg};
 bool endProgram;
 unsigned int iteration_factor = 100;
@@ -90,30 +90,31 @@ pngRGB getColour(unsigned int it, unsigned int rank) noexcept
 }
 
 
-auto fracGen = [](region r,int index, int numTasks, int rank, std::vector<std::vector<pngRGB> >* rows) noexcept
+auto fracGen = [](region r, uint32_t width, uint32_t height, int rank, int numTasks, size_t index, pngData* pixels) noexcept
 {
-    if (rows == nullptr)
+    if(pixels == nullptr)
     {
         return false;
     }
-    size_t pixHeight = rows->size();
-    size_t pixWidth = rows->at(0).size();
 
-    long double incX = std::abs((r.Rmax - r.Rmin)/pixWidth);
-    long double incY = std::abs((r.Imax - r.Imin)/pixHeight);
+    long double incX = std::abs((r.Rmax - r.Rmin)/width);
+    long double incY = std::abs((r.Imax - r.Imin)/height);
+    long double offsetY = incY * rank;
+    int rowStep = height/numDivs;
+    int rowZero =  rowStep * index;
 
-    for(int i = index * pixHeight/numTasks; i < (index + 1) * pixHeight/numTasks; i++)
+    for(int i = rowZero; i < rowZero+rowStep; i++)
 	{
-        if (i == rows->size())
-		{
-			return true;
-		}
+        if(i > height)
+        {
+            return true;
+        }
 
-        for(int j = 0; j < pixWidth; j++)
+        for(int j = 0; j < width; j++)
 		{
 
 			long double x = r.Rmin+(j*incX);
-			long double y = r.Imax-(i*incY);
+            long double y = (r.Imax-(i*incY));
 			long double x0 = x;
 			long double y0 = y;
 
@@ -129,89 +130,39 @@ auto fracGen = [](region r,int index, int numTasks, int rank, std::vector<std::v
 				iteration++;
 			}
 
-            rows->at(i)[j] = getColour(iteration, rank);
+            pixels->at((i*width)+j) = getColour(iteration, rank);
 		}
 	}
 	return false;
 };
 
-void spawnTasks(region reg, bool bench) noexcept
+void spawnTasks(region reg, uint32_t width, uint32_t height, int rank, int procs, pngData& pixels) noexcept
 {
-    std::cout << "Task " << myrank << " of " << nprocs << " drawing region: ";
-    std::cout << myReg.Imin << "i -> " << myReg.Imax << "i // " << myReg.Rmin << " -> " << myReg.Rmax << std::endl;
+//    std::cout << "Task " << myrank << " of " << nprocs << " drawing region: ";
+//    std::cout << myReg.Imin << "i -> " << myReg.Imax << "i // " << myReg.Rmin << " -> " << myReg.Rmax << std::endl;
 
     for(unsigned int i = 0; i < tasks.size(); i++)
 	{
-        //tasks[i] = std::async(std::launch::async, fracGen,reg, i, tasks.size(), myrank, &pngRows);
+        tasks[i] = std::async(std::launch::async, fracGen, reg, width, height, rank, procs, i, &pixels);
 	}
 
     for(unsigned int i = 0; i < tasks.size(); i++)
 	{
         //block until all tasks are done
-		if(tasks[i].get())
-		{
-			auto d = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - genTime).count();
-		}
+        tasks[i].get();
 	}
 
 }
 
-
-int runProgram(bool benching) noexcept
+region defineRegion(region r, int rank, int procs)
 {
-	//CreateFractal(reg);
-    genTime = std::chrono::high_resolution_clock::now();
-    spawnTasks(myReg, benching);
-
-	return 0;
-}
-
-void defineRegion(unsigned int rank, unsigned int procs)
-{
-    region cropped;
-    //find the closest square
-    int p = procs;
-    int r = sqrt(p);
-    while( (r*r) != p )
-    {
-        p -= 1;
-        r = sqrt(p);
-    }
-    int left = procs % p;
-    if(rank == 1)
-    {
-        std::cout << "From " << procs << " tasks we have a " << r << "x" << r << " + " << left << " area " << std::endl;
-    }
-    //we have R*R + left processes;
-    long double imStep = (reg.Imax - reg.Imin) / r;
-    long double imStepover = 0;
-    long double rStep = (reg.Rmax - reg.Rmin) / r;
-    if(left != 0)
-    {
-        rStep = (reg.Rmax - reg.Rmin) / (r + 1);
-        imStepover = (reg.Imax - reg.Imin) / left;
-    }
-
-    if(rank < r*r)
-    {
-        myReg.Imax = reg.Imax - (imStep*(rank/r));
-        myReg.Imin = myReg.Imax - imStep;
-
-        myReg.Rmin = reg.Rmin + (rStep* (rank%r));
-        myReg.Rmax = myReg.Rmin + rStep;
-    }
-    else
-    {
-        myReg.Imax = reg.Imax - (imStepover*(rank%r));
-        myReg.Imin = myReg.Imax - imStepover;
-
-        myReg.Rmin = reg.Rmin + (rStep * r);
-        myReg.Rmax = myReg.Rmin + rStep;
-
-        //height = height * imStepover / imStep;
-
-    }
-
+    long double ImLength = r.Imax - r.Imin;
+    long double ImStep = ImLength/nprocs;
+    region myReg = r;
+    //bit wonky due to images being drawn top to bottom
+    myReg.Imax = myReg.Imax - (ImStep*rank);
+    myReg.Imin = myReg.Imax - ImStep;
+    return myReg;
 }
 
 int main (int argc, char** argv) noexcept
@@ -222,6 +173,8 @@ int main (int argc, char** argv) noexcept
     MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
 
 
+    auto start = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - genTime).count();
+
 
     if(nprocs == 0 )
     {
@@ -230,18 +183,24 @@ int main (int argc, char** argv) noexcept
     }
 
     int closestSqrt = nprocs;
-    int r = static_cast<int>(sqrt(closestSqrt));
-    while( (r*r) != closestSqrt )
-    {
-        closestSqrt -= 1;
-        r = static_cast<int>(sqrt(closestSqrt));
-    }
+//    int r = static_cast<int>(sqrt(closestSqrt));
+//    while( (r*r) != closestSqrt )
+//    {
+//        closestSqrt -= 1;
+//        r = static_cast<int>(sqrt(closestSqrt));
+//    }
 
-    uint32_t height = 1920 * closestSqrt;
-    uint32_t width  = 4096 * closestSqrt;
+    uint32_t height = 1920 * 6;
+    uint32_t width  = 4096 * 6;
+//    uint32_t height = 720 * 1;
+//    uint32_t width  = 1024 * 1;
 
 
-    std::vector<pngRGB> pngRows;
+
+    pngData pngRows;
+    pngData workRows;
+
+
 
     pngWriter writer(0,0);
 
@@ -252,20 +211,66 @@ int main (int argc, char** argv) noexcept
         writer.setWidth(width);
         writer.Init();
         writer.Alloc(pngRows);
+
+
     }
 
+    workRows.resize(width*(height/nprocs));
 
-    defineRegion(myrank,nprocs);
 
+
+
+
+
+
+    MPI_Scatter(reinterpret_cast<void*>(pngRows.data()),
+                width*3*height/nprocs,
+                MPI_UINT16_T,
+                reinterpret_cast<void*>(workRows.data()),
+                workRows.size()*3,
+                MPI_UINT16_T,
+                0,
+                MPI_COMM_WORLD
+                );
 
     int res = 0;
     std::ofstream outlog;
 
 
-    if( res == 0)
+    region myReg = defineRegion(reg, myrank, nprocs);
+
+
+    spawnTasks(myReg, width, height/nprocs, myrank, nprocs, workRows);
+
+    MPI_Gather(reinterpret_cast<void*>(workRows.data()),
+               workRows.size()*3,
+               MPI_UINT16_T,
+               reinterpret_cast<void*>(pngRows.data()),
+               workRows.size()*3,
+               MPI_UINT16_T,
+               0,
+               MPI_COMM_WORLD
+               );
+
+
+
+    if(myrank == 0)
     {
-        res = runProgram(false);
+
+        auto end = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - genTime).count();
+        std::cout << "Generating fractal of " << width << "x" << height << " using " << nprocs << " workers took ";
+        std::cout << (end-start)/1000 << "." << (end-start)%1000 << " seconds" << std::endl;
+
+        writer.Write(pngRows);
     }
+
+
+    //defineRegion(myrank,nprocs);
+
+
+
+
+
 
     if(outlog.is_open())
     {
