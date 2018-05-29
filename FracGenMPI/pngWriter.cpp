@@ -47,7 +47,7 @@ bool pngWriter::Init()
 
     // Write header (8 bit colour depth)
     png_set_IHDR(writePtr, infoPtr, w, h,
-    8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+    16, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
     PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
 
 

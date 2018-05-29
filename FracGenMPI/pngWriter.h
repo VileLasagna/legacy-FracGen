@@ -4,7 +4,7 @@
 #include <vector>
 #include <cstdint>
 
-using pngColourType = png_uint_32;
+using pngColourType = png_uint_16;
 
 struct pngRGB
 {
