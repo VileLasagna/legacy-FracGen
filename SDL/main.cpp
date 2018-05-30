@@ -28,7 +28,7 @@ long double power = 2;
 std::shared_ptr<int> ColourScheme(new int(0));
 auto genTime (std::chrono::high_resolution_clock::now());
 
-size_t numDivs = 24;
+size_t numDivs = std::thread::hardware_concurrency() * 4;
 
 //std::array<std::future<bool>, numDivs> tasks;
 std::vector<std::future<bool>> tasks(numDivs);
@@ -151,7 +151,7 @@ int runProgram(bool benching) noexcept
     std::shared_ptr<std::atomic_bool> redraw(new std::atomic_bool);
     redraw->store(true);
 
-    FracGenWindow mainWindow(1280,720,32, redraw);
+    FracGenWindow mainWindow(1280,1024,32, redraw);
     mainWindow.registerColourFlag(ColourScheme);
     mainWindow.setRegion(reg);
 

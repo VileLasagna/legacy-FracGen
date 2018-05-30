@@ -5,12 +5,12 @@ FracGenWindow::FracGenWindow(size_t w, size_t h, int bpp, std::shared_ptr<std::a
     :width{w},
      height{h},
      colourDepth{bpp},
-     redrawRequired{redrawFlag},
      drawRect{false},
      rectX{0},
      rectY{0},
      mouseX{0},
-     mouseY{0}
+     mouseY{0},
+     redrawRequired{redrawFlag}
 {
     SDL_Init(SDL_INIT_EVERYTHING);
     mainwindow = SDL_CreateWindow("Mandelbrot Fractal Explorer - Use Mouse1 to zoom in and Mouse2 to zoom out. Press Mouse 3 to change colouring scheme",
