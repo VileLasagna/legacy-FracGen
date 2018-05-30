@@ -25,8 +25,6 @@ struct region{long double Imin,Imax,Rmin,Rmax;}; //This struct delimits a region
 bool operator==(const region& r1, const region& r2){return ( (r1.Imax - r2.Imax <= LDBL_EPSILON) && (r1.Imin - r2.Imin <= LDBL_EPSILON)
 														  && (r1.Rmax - r2.Rmax <= LDBL_EPSILON) && (r1.Rmin - r2.Rmin <= LDBL_EPSILON) );}
 
-region reg {-1.5,1.5,-2,1};
-region myReg {reg};
 bool endProgram;
 unsigned int iteration_factor = 100;
 unsigned int max_iteration = 256 * iteration_factor;
@@ -182,7 +180,7 @@ int main (int argc, char** argv) noexcept
         nprocs = 1;
     }
 
-    int closestSqrt = nprocs;
+//    int closestSqrt = nprocs;
 //    int r = static_cast<int>(sqrt(closestSqrt));
 //    while( (r*r) != closestSqrt )
 //    {
@@ -215,20 +213,16 @@ int main (int argc, char** argv) noexcept
 
     }
 
-    workRows.resize(width*(height/nprocs));
+    workRows.resize(width*(height/static_cast<unsigned int>(nprocs)));
+
+
+    region reg {-1.5l,1.5l,-2,1};
 
 
 
-
-
-
-
-    MPI_Scatter(reinterpret_cast<void*>(pngRows.data()),
-                width*3*height/nprocs,
-                MPI_UINT16_T,
-                reinterpret_cast<void*>(workRows.data()),
-                workRows.size()*3,
-                MPI_UINT16_T,
+    MPI_Bcast(  reinterpret_cast<void*>(&reg),
+                4,
+                MPI_LONG_DOUBLE,
                 0,
                 MPI_COMM_WORLD
                 );
@@ -240,13 +234,13 @@ int main (int argc, char** argv) noexcept
     region myReg = defineRegion(reg, myrank, nprocs);
 
 
-    spawnTasks(myReg, width, height/nprocs, myrank, nprocs, workRows);
+    spawnTasks(myReg, width, height/static_cast<unsigned int>(nprocs), myrank, nprocs, workRows);
 
     MPI_Gather(reinterpret_cast<void*>(workRows.data()),
-               workRows.size()*3,
+               static_cast<int>(workRows.size()*3),
                MPI_UINT16_T,
                reinterpret_cast<void*>(pngRows.data()),
-               workRows.size()*3,
+               static_cast<int>(workRows.size()*3),
                MPI_UINT16_T,
                0,
                MPI_COMM_WORLD
