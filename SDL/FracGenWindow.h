@@ -27,7 +27,7 @@ using SurfUnq = std::unique_ptr<SDL_Surface>;
 class FracGenWindow
 {
 public:
-    FracGenWindow(size_t width, size_t height, int bpp, std::shared_ptr<std::atomic_bool> redrawFlag);
+    FracGenWindow(int width, int height, int bpp, std::shared_ptr<std::atomic_bool> redrawFlag);
     ~FracGenWindow();
 
     void draw(std::shared_ptr<SDL_Surface> surface);
@@ -49,8 +49,8 @@ private:
     bool onMouseMotionEvent(const SDL_MouseMotionEvent& e) noexcept;
     bool onMouseButtonEvent(const SDL_MouseButtonEvent& e ) noexcept;
 
-    size_t  width;
-    size_t  height;
+    int  width;
+    int  height;
     int  colourDepth;
     bool    drawRect;
     int     rectX;

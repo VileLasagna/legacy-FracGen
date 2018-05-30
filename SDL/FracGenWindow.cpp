@@ -1,7 +1,7 @@
 #include "FracGenWindow.h"
 
 
-FracGenWindow::FracGenWindow(size_t w, size_t h, int bpp, std::shared_ptr<std::atomic_bool> redrawFlag)
+FracGenWindow::FracGenWindow(int w, int h, int bpp, std::shared_ptr<std::atomic_bool> redrawFlag)
     :width{w},
      height{h},
      colourDepth{bpp},
@@ -47,7 +47,7 @@ FracGenWindow::FracGenWindow(size_t w, size_t h, int bpp, std::shared_ptr<std::a
         for(int j = 0; j< frac->w; j++)
         {
 
-            uint8_t* p = reinterpret_cast<uint8_t*>(pix) +
+           auto p = reinterpret_cast<uint8_t*>(pix) +
                     (i * highlight->pitch)
                     + j*highlight->format->BytesPerPixel;
             *p = SDL_MapRGB(frac->format, 255, 255, 255);
@@ -66,15 +66,15 @@ FracGenWindow::~FracGenWindow()
 void FracGenWindow::paint()
 {
 
-    SDL_BlitSurface(frac.get(),0,screen.get(),0);
+    SDL_BlitSurface(frac.get(),nullptr,screen.get(),nullptr);
     if(drawRect)
     {
         drawHighlight();
     }
 
-    SDL_UpdateTexture(texture, NULL, screen->pixels, screen->pitch);
+    SDL_UpdateTexture(texture, nullptr, screen->pixels, screen->pitch);
     SDL_RenderClear(render);
-    SDL_RenderCopy(render, texture, NULL, NULL);
+    SDL_RenderCopy(render, texture, nullptr, nullptr);
     SDL_RenderPresent(render);
 
 
@@ -90,20 +90,16 @@ bool FracGenWindow::captureEvents()
         case SDL_KEYDOWN:
         case SDL_KEYUP:
             return onKeyboardEvent(event.key);
-            break;
 
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
             return onMouseButtonEvent(event.button);
-            break;
 
         case SDL_QUIT:
             return false;
-            break;
 
         case SDL_MOUSEMOTION:
             return onMouseMotionEvent(event.motion);
-            break;
 
         case SDL_JOYAXISMOTION:
         case SDL_JOYBUTTONDOWN:
@@ -162,17 +158,17 @@ bool FracGenWindow::onMouseMotionEvent(const SDL_MouseMotionEvent &e) noexcept
         return true;
     }
     float ra = abs(rw/rh);
-    if (ra == AspectRatio())
+    if ( (ra - AspectRatio()) <= FLT_EPSILON)
     {
         return true;
     }
     if (ra < AspectRatio())
     {
-        mouseX = rectX + rh*AspectRatio();
+        mouseX = static_cast<int>(rectX + rh*AspectRatio());
     }
     else
     {
-        mouseY = rectY + rw/AspectRatio();
+        mouseY = static_cast<int>(rectY + rw/AspectRatio());
     }
     return true;
 }
@@ -209,8 +205,8 @@ bool FracGenWindow::onMouseButtonEvent(const SDL_MouseButtonEvent &e) noexcept
         //Right Button
         if(ROI != nullptr)
         {
-            ROI->Imax = 1.5;
-            ROI->Imin = -1.5;
+            ROI->Imax = 1.5l;
+            ROI->Imin = -1.5l;
             ROI->Rmax = 1;
             ROI->Rmin = -2;
             redrawRequired->store(true);
@@ -228,11 +224,11 @@ bool FracGenWindow::onMouseButtonEvent(const SDL_MouseButtonEvent &e) noexcept
         int rx = mouseX;
         int ry = mouseY;
 
-        double x0 = ROI->Rmin + ((ROI->Rmax - ROI->Rmin)/width) * rectX;
-        double x1 = ROI->Rmin + ((ROI->Rmax - ROI->Rmin)/width) * rx;
+        long double x0 = ROI->Rmin + ((ROI->Rmax - ROI->Rmin)/width) * rectX;
+        long double x1 = ROI->Rmin + ((ROI->Rmax - ROI->Rmin)/width) * rx;
 
-        double y0 = ROI->Imax - ((ROI->Imax - ROI->Imin)/height) * rectY;
-        double y1 = ROI->Imax - ((ROI->Imax - ROI->Imin)/height) * ry;
+        long double y0 = ROI->Imax - ((ROI->Imax - ROI->Imin)/height) * rectY;
+        long double y1 = ROI->Imax - ((ROI->Imax - ROI->Imin)/height) * ry;
 
         ROI->Rmax = (x0>x1?x0:x1);
         ROI->Rmin = (x0>x1?x1:x0);
