@@ -16,7 +16,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "FracGenWindow.h"
+#include "FracGenWindow.hpp"
 
 
 

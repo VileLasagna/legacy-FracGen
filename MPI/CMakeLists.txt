@@ -1,7 +1,7 @@
 project(ToyBrotMPI)
 
 add_executable(${PROJECT_NAME}  "main.cpp"
-                                "pngWriter.h"
+                                "pngWriter.hpp"
                                 "pngWriter.cpp")
 
 

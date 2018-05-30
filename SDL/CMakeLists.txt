@@ -1,7 +1,7 @@
 project(ToybrotSDL)
 
 add_executable(${PROJECT_NAME}  "main.cpp"
-                                "FracGenWindow.h"
+                                "FracGenWindow.hpp"
                                 "FracGenWindow.cpp")
 
 if(NOT WIN32)

@@ -1,4 +1,4 @@
-#include "FracGenWindow.h"
+#include "FracGenWindow.hpp"
 
 
 FracGenWindow::FracGenWindow(int w, int h, int bpp, std::shared_ptr<std::atomic_bool> redrawFlag)

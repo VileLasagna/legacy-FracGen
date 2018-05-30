@@ -17,7 +17,7 @@
 #include <cstdint>
 
 #include <mpi.h>
-#include "pngWriter.h"
+#include "pngWriter.hpp"
 
 
 
