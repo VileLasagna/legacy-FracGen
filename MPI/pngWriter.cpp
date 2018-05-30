@@ -75,7 +75,7 @@ bool pngWriter::Init()
 bool pngWriter::Write(const pngData& data)
 {
     // Write image data
-    for (int row = 0; row < h; row ++)
+    for (unsigned int row = 0; row < h; row ++)
     {
        png_write_row(writePtr, reinterpret_cast<png_const_bytep>(data.data()+(row*w)) );
     }
