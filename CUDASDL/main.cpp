@@ -156,8 +156,8 @@ int runProgram(bool benching) noexcept
     std::shared_ptr<std::atomic_bool> redraw(new std::atomic_bool);
     redraw->store(true);
 
-    int windowWidth = 480;
-    int windowHeight = 320;
+    int windowWidth = 1280;
+    int windowHeight = 720;
     FracGenWindow mainWindow(windowWidth,windowHeight,32, redraw);
     mainWindow.registerColourFlag(ColourScheme);
     mainWindow.setRegion(reg);

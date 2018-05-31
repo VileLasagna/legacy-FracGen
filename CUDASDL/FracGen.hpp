@@ -12,6 +12,7 @@ bool operator==(const Region& r1, const Region& r2);
 
 using colourType = uint8_t;
 using ImageData = colourType*;
+struct RGBA{colourType r,g,b,a;};
 
 class FracGen
 {
@@ -24,7 +25,6 @@ public:
 
 private:
 
-    void Iterations(std::vector<int>& v, int width, int height, Region r);
     uint32_t getColour();
 };
 
