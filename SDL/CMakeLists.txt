@@ -1,4 +1,4 @@
-project(ToybrotSDL)
+project(ToybrotSDL LANGUAGES CXX)
 
 add_executable(${PROJECT_NAME}  "main.cpp"
                                 "FracGenWindow.hpp"

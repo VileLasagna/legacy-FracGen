@@ -1,4 +1,4 @@
-project(ToyBrotMPI)
+project(ToyBrotMPI LANGUAGES CXX)
 
 add_executable(${PROJECT_NAME}  "main.cpp"
                                 "pngWriter.hpp"

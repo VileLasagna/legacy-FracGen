@@ -1,4 +1,4 @@
-project(ToybrotMPISDL)
+project(ToybrotMPISDL LANGUAGES CXX)
 
 add_executable(${PROJECT_NAME}  "main.cpp")
 
